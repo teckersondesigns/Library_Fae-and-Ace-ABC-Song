@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Storybook</title>
+<style>
+/* ===== HOW TO USE =====
+ Each book = a folder:  books/NAME/book.json + page images.
+ Open the reader with:  reader.html?book=NAME
+ book.json example:
+ { "title": "My Bear Book",
+   "pages": ["1.jpg","2.jpg","3.jpg"],
+   "audio": ["1.mp3","2.mp3","3.mp3"] }   <- audio is optional
+ With no ?book= the demo book below is shown. */
+html,body{margin:0;height:100%;background:#fff7e6;font-family:Arial,sans-serif;
+  overflow:hidden;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+#app{display:flex;flex-direction:column;height:100%}
+#stage{flex:1;display:flex;align-items:center;justify-content:center;min-height:0;padding:8px}
+#page{max-width:100%;max-height:100%;border-radius:16px;box-shadow:0 4px 14px rgba(0,0,0,.25);
+  background:#fff;object-fit:contain;pointer-events:none}
+#bar{display:flex;gap:12px;justify-content:center;align-items:center;padding:10px}
+button{border:0;border-radius:50px;font-size:clamp(20px,5vw,34px);font-weight:bold;color:#fff;
+  min-width:clamp(90px,22vw,170px);height:clamp(60px,14vw,90px);cursor:pointer;
+  box-shadow:0 5px 0 rgba(0,0,0,.25)}
+button:active{transform:translateY(4px);box-shadow:0 1px 0 rgba(0,0,0,.25)}
+#back{background:#4a90e2}#next{background:#43b649}#again{background:#f5a623}#sound{background:#9b59b6;min-width:clamp(60px,14vw,90px)}
+button[hidden]{display:none}
+#dots{font-size:18px;color:#a67c00;min-width:60px;text-align:center}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage"><img id="page" alt="Book page" draggable="false"></div>
+  <div id="bar">
+    <button id="back" aria-label="Back">◀</button>
+    <button id="sound" aria-label="Play sound" hidden>🔊</button>
+    <span id="dots"></span>
+    <button id="again" hidden>↺ Again</button>
+    <button id="next" aria-label="Next">▶</button>
+  </div>
+</div>
+<audio id="audio"></audio>
+<script>
+// Demo book (colored pages) used when no ?book= is given
+function demoPage(n,color,text){
+  const s='<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><rect width="800" height="600" fill="'+color+'"/><text x="400" y="330" font-size="120" text-anchor="middle" font-family="Arial" fill="#fff">'+text+'</text></svg>';
+  return 'data:image/svg+xml;utf8,'+encodeURIComponent(s);
+}
+const DEMO={title:"Demo",base:"",audio:[],
+  pages:[demoPage(1,"#e74c3c","Page 1"),demoPage(2,"#3498db","Page 2"),demoPage(3,"#2ecc71","Page 3"),demoPage(4,"#f39c12","The End")]};
+
+const $=id=>document.getElementById(id);
+const img=$("page"),back=$("back"),next=$("next"),again=$("again"),sound=$("sound"),dots=$("dots"),audio=$("audio");
+let book=DEMO,i=0;
+
+function show(){
+  img.src=book.base+book.pages[i];
+  const last=i===book.pages.length-1;
+  back.style.visibility=i===0?"hidden":"visible";
+  next.hidden=last; again.hidden=!last;
+  dots.textContent=(i+1)+" / "+book.pages.length;
+  audio.pause();
+  const a=book.audio&&book.audio[i];
+  sound.hidden=!a;
+  if(a){audio.src=book.base+a;audio.play().catch(()=>{});}
+  // preload next page
+  if(!last){const p=new Image();p.src=book.base+book.pages[i+1];}
+}
+function go(d){const n=i+d;if(n>=0&&n<book.pages.length){i=n;show();}}
+next.onclick=()=>go(1);
+back.onclick=()=>go(-1);
+again.onclick=()=>{i=0;show();};
+sound.onclick=()=>{audio.currentTime=0;audio.play().catch(()=>{});};
+
+// Swipe support
+let x0=null;
+document.addEventListener("touchstart",e=>{x0=e.touches[0].clientX;},{passive:true});
+document.addEventListener("touchend",e=>{
+  if(x0===null)return;const dx=e.changedTouches[0].clientX-x0;x0=null;
+  if(Math.abs(dx)>50)go(dx<0?1:-1);
+});
+document.addEventListener("keydown",e=>{if(e.key==="ArrowRight")go(1);if(e.key==="ArrowLeft")go(-1);});
+// Block right-click / links so kids stay on the page
+document.addEventListener("contextmenu",e=>e.preventDefault());
+
+const name=new URLSearchParams(location.search).get("book");
+if(name&&/^[\w-]+$/.test(name)){
+  const base="books/"+name+"/";
+  fetch(base+"book.json").then(r=>r.json()).then(b=>{
+    book={title:b.title,pages:b.pages,audio:b.audio||[],base:base};
+    document.title=b.title||"Storybook";show();
+  }).catch(()=>{img.alt="Book not found";});
+}else show();
+</script>
+</body>
+</html>
